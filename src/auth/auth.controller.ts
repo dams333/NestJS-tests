@@ -85,10 +85,4 @@ export class AuthController {
         }
         throw new ForbiddenException('Invalid access');
     }
-
-    @Get('test')
-    @UseGuards(AuthGuard, AccessGuard('test'))
-    test(): string {
-        return JSON.stringify({ message: 'You are logged' });
-    }
 }
