@@ -5,7 +5,7 @@ import { AuthProcess } from 'src/42.js/auth/auth_manager';
 import { LoggedUser } from 'src/42.js/structures/logged_user';
 import { PannelUser } from 'src/types/user.model';
 
-let users: PannelUser[] = [{ id: 1, login: 'dhubleur' }];
+let users: PannelUser[] = [{ id: 1, login: 'dhubleur', access: ['bde', 'si'] }];
 
 @Injectable()
 export class AuthService {
@@ -43,6 +43,7 @@ export class AuthService {
             pannelUser = {
                 id: users.length,
                 login: user.login,
+                access: [],
             };
             users.push(pannelUser);
         }

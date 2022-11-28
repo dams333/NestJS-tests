@@ -2,16 +2,19 @@ import {
     BadRequestException,
     Body,
     Controller,
+    ForbiddenException,
     Get,
     NotFoundException,
+    Param,
     Post,
     Query,
+    Req,
     Res,
     UseGuards,
     ValidationPipe,
 } from '@nestjs/common';
 import { CreateTokenDto } from 'src/types/token.model';
-import { AuthGuard } from './auth.guard';
+import { AccessGuard, AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -56,9 +59,36 @@ export class AuthController {
         }
     }
 
-    @Get('test')
+    @Get('logged')
     @UseGuards(AuthGuard)
+    testLog(): string {
+        return JSON.stringify({ message: 'You are logged' });
+    }
+
+    @Get('access/:access')
+    @UseGuards(AuthGuard)
+    async testAccess(
+        @Param('access') access: string,
+        @Req() req,
+    ): Promise<string> {
+        const authorizationHeader = req.headers.authorization;
+        if (authorizationHeader) {
+            try {
+                const token = authorizationHeader.replace('Bearer ', '');
+                const user = await this.authService.verifyAccessToken(token);
+                if (user && user.access.includes(access)) {
+                    return JSON.stringify({ message: 'You have access' });
+                }
+            } catch (e) {
+                throw new ForbiddenException('Invalid access');
+            }
+        }
+        throw new ForbiddenException('Invalid access');
+    }
+
+    @Get('test')
+    @UseGuards(AuthGuard, AccessGuard('test'))
     test(): string {
-        return 'test';
+        return JSON.stringify({ message: 'You are logged' });
     }
 }
