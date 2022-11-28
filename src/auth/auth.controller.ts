@@ -1,37 +1,26 @@
 import {
     BadRequestException,
+    Body,
     Controller,
     Get,
-    InternalServerErrorException,
     NotFoundException,
+    Post,
     Query,
     Res,
+    UseGuards,
+    ValidationPipe,
 } from '@nestjs/common';
-import { Client } from 'src/42.js/structures/client';
-import { AuthProcess } from 'src/42.js/auth/auth_manager';
+import { CreateTokenDto } from 'src/types/token.model';
+import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
-    private _auth_processes: AuthProcess | null = null;
-    private _client: Client;
-    constructor(private readonly authService: AuthService) {
-        this._client = new Client(
-            <string>process.env.CLIENT_ID,
-            <string>process.env.CLIENT_SECRET,
-        );
-    }
+    constructor(private readonly authService: AuthService) {}
 
     @Get()
     async redirectToAuth(@Res() res) {
-        if (!this._auth_processes) {
-            this._auth_processes =
-                await this._client.auth_manager.init_auth_process(
-                    'http://localhost:3000/auth/callback',
-                    ['public', 'projects', 'profile'],
-                );
-        }
-        res.redirect(this._auth_processes.url);
+        res.redirect((await this.authService.get_auth_processes()).url);
     }
 
     @Get('callback')
@@ -39,16 +28,37 @@ export class AuthController {
         if (!code) {
             throw new BadRequestException('No code provided');
         }
-        if (!this._auth_processes) {
-            throw new InternalServerErrorException('No auth process found');
-        }
-        const user = await this._client.auth_manager.response_auth_process(
-            this._auth_processes.id,
-            code,
-        );
+        const user =
+            await this.authService.client.auth_manager.response_auth_process(
+                (
+                    await this.authService.get_auth_processes()
+                ).id,
+                code,
+            );
         if (!user) {
             throw new NotFoundException('User not found');
         }
-        return `Welcome ${user.login}`;
+        return await this.authService.validateAuth(user);
+    }
+
+    @Post('refresh')
+    async refresh(
+        @Body(new ValidationPipe()) createToken: CreateTokenDto,
+    ): Promise<string> {
+        const refreshToken = createToken.refresh_token;
+        if (!refreshToken) {
+            throw new BadRequestException('No refresh token provided');
+        }
+        try {
+            return await this.authService.refresh(refreshToken);
+        } catch (e) {
+            throw new BadRequestException('Invalid refresh token');
+        }
+    }
+
+    @Get('test')
+    @UseGuards(AuthGuard)
+    test(): string {
+        return 'test';
     }
 }
